@@ -8,13 +8,11 @@ def get_connection():
     return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("✏️ Edit a Food Entry")
-st.write("Update an existing food entry.")
 
 try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Pull all entries dynamically
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -23,35 +21,33 @@ try:
     rows = cur.fetchall()
 
     if not rows:
-        st.info("No entries available to edit.")
+        st.info("No entries available.")
     else:
         entry_options = {
-            f"ID {row[0]} | {row[1]} | {row[2]} | {row[3]} | Qty: {row[4]}": row
-            for row in rows
+            f"ID {r[0]} | {r[1]} | {r[2]} | {r[3]} | Qty: {r[4]}": r
+            for r in rows
         }
 
-        selected_label = st.selectbox("Select an entry to edit", list(entry_options.keys()))
-        selected_entry = entry_options[selected_label]
+        selected = st.selectbox("Select entry", list(entry_options.keys()))
+        entry = entry_options[selected]
 
-        entry_id = selected_entry[0]
-        current_date = pd.to_datetime(selected_entry[1]).date()
-        current_location = selected_entry[2].strip() if selected_entry[2] else ""
-        current_item = selected_entry[3]
-        current_quantity = float(selected_entry[4])
+        entry_id = entry[0]
+        current_date = pd.to_datetime(entry[1]).date()
+        current_location = entry[2]
+        current_item = entry[3]
+        current_quantity = float(entry[4])
 
-        # Pull existing locations only
         cur.execute("""
-            SELECT DISTINCT TRIM(location) AS location
+            SELECT DISTINCT TRIM(location)
             FROM "food_entries_master_cleaned (2)"
             WHERE location IS NOT NULL AND TRIM(location) <> ''
             ORDER BY location;
         """)
-        location_results = cur.fetchall()
-        existing_locations = [row[0] for row in location_results]
+        existing_locations = [row[0] for row in cur.fetchall()]
 
         location_index = existing_locations.index(current_location) if current_location in existing_locations else 0
 
-        with st.form("edit_entry_form"):
+        with st.form("edit_form"):
             new_date = st.date_input("Date", value=current_date)
 
             new_location = st.selectbox(
@@ -61,36 +57,25 @@ try:
             )
 
             new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input(
-                "Quantity",
-                min_value=0.0,
-                value=current_quantity,
-                step=1.0
-            )
+            new_quantity = st.number_input("Quantity", min_value=0.0, value=current_quantity, step=1.0)
 
-            submitted = st.form_submit_button("Update Entry")
+            submitted = st.form_submit_button("Update")
 
             if submitted:
                 new_item = new_item.strip() if new_item else ""
 
                 if new_location and new_item:
-                    try:
-                        cur.execute("""
-                            UPDATE "food_entries_master_cleaned (2)"
-                            SET date = %s,
-                                location = %s,
-                                item = %s,
-                                quantity = %s
-                            WHERE id = %s;
-                        """, (new_date, new_location, new_item, new_quantity, entry_id))
+                    cur.execute("""
+                        UPDATE "food_entries_master_cleaned (2)"
+                        SET date=%s, location=%s, item=%s, quantity=%s
+                        WHERE id=%s;
+                    """, (new_date, new_location, new_item, new_quantity, entry_id))
 
-                        conn.commit()
-                        st.success(f"✅ Entry ID {entry_id} updated successfully.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error updating entry: {e}")
+                    conn.commit()
+                    st.success("✅ Updated successfully")
+                    st.rerun()
                 else:
-                    st.warning("Please fill in all required fields.")
+                    st.warning("Please enter an item.")
 
     cur.close()
     conn.close()
