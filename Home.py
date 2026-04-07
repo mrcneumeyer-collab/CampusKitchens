@@ -2,10 +2,14 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 
-st.set_page_config(page_title="Food Entry Database App", page_icon="🍽️", layout="wide")
+st.set_page_config(
+    page_title="Food Entry Database App",
+    page_icon="🍽️",
+    layout="wide"
+)
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB"])
+    return psycopg2.connect(st.secrets["URL_DB1"])
 
 st.title("🍽️ Food Entry Database App")
 st.write("Welcome! Use the sidebar to view, add, edit, or delete food entries.")
@@ -17,6 +21,7 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
+    # Summary metrics
     cur.execute('SELECT COUNT(*) FROM "food_entries_master_cleaned (2)";')
     total_entries = cur.fetchone()[0]
 
@@ -38,28 +43,39 @@ try:
     st.markdown("---")
     st.subheader("🔍 Filter Food Entries")
 
-    # Get locations for dropdown
+    # Dynamic year options from database
+    cur.execute("""
+        SELECT DISTINCT EXTRACT(YEAR FROM date) AS year
+        FROM "food_entries_master_cleaned (2)"
+        WHERE date IS NOT NULL
+        ORDER BY year;
+    """)
+    year_results = cur.fetchall()
+    year_options = ["All"] + [str(int(row[0])) for row in year_results if row[0] is not None]
+
+    # Dynamic location options from database
     cur.execute("""
         SELECT DISTINCT location
         FROM "food_entries_master_cleaned (2)"
+        WHERE location IS NOT NULL AND location <> ''
         ORDER BY location;
     """)
     location_results = cur.fetchall()
     location_options = ["All"] + [row[0] for row in location_results]
 
-    col1, col2 = st.columns(2)
+    filter_col1, filter_col2 = st.columns(2)
 
-    with col1:
-        year_filter = st.selectbox("Filter by Year", ["All", "2023", "2024", "2025", "2026", "2027"])
+    with filter_col1:
+        year_filter = st.selectbox("Filter by Year", year_options)
 
-    with col2:
+    with filter_col2:
         location_filter = st.selectbox("Filter by Location", location_options)
 
     st.markdown("---")
     st.subheader("📋 Food Entries Table")
 
-    # Build query based on filters
-    base_query = """
+    # Build filtered query
+    query = """
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
         WHERE 1=1
@@ -67,20 +83,23 @@ try:
     params = []
 
     if year_filter != "All":
-        base_query += ' AND CAST(date AS TEXT) LIKE %s'
-        params.append(f"{year_filter}%")
+        query += " AND EXTRACT(YEAR FROM date) = %s"
+        params.append(int(year_filter))
 
     if location_filter != "All":
-        base_query += " AND location = %s"
+        query += " AND location = %s"
         params.append(location_filter)
 
-    base_query += " ORDER BY date ASC, id ASC;"
+    query += " ORDER BY date ASC, id ASC;"
 
-    cur.execute(base_query, tuple(params))
+    cur.execute(query, tuple(params))
     rows = cur.fetchall()
 
     if rows:
-        df = pd.DataFrame(rows, columns=["ID", "Date", "Location", "Item", "Quantity"])
+        df = pd.DataFrame(
+            rows,
+            columns=["ID", "Date", "Location", "Item", "Quantity"]
+        )
         df["Date"] = df["Date"].astype(str)
         st.dataframe(df, use_container_width=True)
     else:
