@@ -1,124 +1,38 @@
 import streamlit as st
 import psycopg2
-import pandas as pd
 
-st.set_page_config(page_title="Edit Food Entry", page_icon="✏️")
+st.set_page_config(page_title="Add Food Entry", page_icon="➕")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB"])
+    return psycopg2.connect(st.secrets["DB_URL"])
 
-st.title("✏️ Edit a Food Entry")
-st.write("Update an existing food entry using a current or new location.")
+st.title("➕ Add a New Food Entry")
 
-try:
-    conn = get_connection()
-    cur = conn.cursor()
+with st.form("add_entry_form"):
+    entry_date = st.date_input("Date")
+    location = st.text_input("Location")
+    item = st.text_input("Item")
+    quantity = st.number_input("Quantity", min_value=0.0, step=1.0)
 
-    # Get all current entries dynamically
-    cur.execute("""
-        SELECT id, date, location, item, quantity
-        FROM "food_entries_master_cleaned (2)"
-        ORDER BY date ASC, id ASC;
-    """)
-    rows = cur.fetchall()
+    submitted = st.form_submit_button("Add Entry")
 
-    if not rows:
-        st.info("No entries available to edit.")
-    else:
-        entry_options = {
-            f"ID {row[0]} | {row[1]} | {row[2]} | {row[3]} | Qty: {row[4]}": row
-            for row in rows
-        }
+    if submitted:
+        if location and item:
+            try:
+                conn = get_connection()
+                cur = conn.cursor()
 
-        selected_label = st.selectbox("Select an entry to edit", list(entry_options.keys()))
-        selected_entry = entry_options[selected_label]
+                cur.execute("""
+                    INSERT INTO food_entries_master (date, location, item, quantity)
+                    VALUES (%s, %s, %s, %s);
+                """, (entry_date, location, item, quantity))
 
-        entry_id = selected_entry[0]
-        current_date = pd.to_datetime(selected_entry[1]).date()
-        current_location = selected_entry[2].strip() if selected_entry[2] else ""
-        current_item = selected_entry[3]
-        current_quantity = float(selected_entry[4])
+                conn.commit()
+                cur.close()
+                conn.close()
 
-        # Get current locations dynamically
-        cur.execute("""
-            SELECT DISTINCT TRIM(location) AS location
-            FROM "food_entries_master_cleaned (2)"
-            WHERE location IS NOT NULL AND TRIM(location) <> ''
-            ORDER BY location;
-        """)
-        location_results = cur.fetchall()
-        existing_locations = [row[0] for row in location_results]
-
-        with st.form("edit_entry_form"):
-            new_date = st.date_input("Date", value=current_date)
-
-            st.subheader("Location")
-            if current_location in existing_locations:
-                default_index = existing_locations.index(current_location)
-                location_choice = st.radio(
-                    "Choose how to update the location:",
-                    ["Select existing location", "Enter new location"]
-                )
-
-                if location_choice == "Select existing location":
-                    new_location = st.selectbox(
-                        "Existing Locations",
-                        existing_locations,
-                        index=default_index
-                    )
-                else:
-                    new_location = st.text_input("New Location", value=current_location)
-            else:
-                location_choice = st.radio(
-                    "Choose how to update the location:",
-                    ["Select existing location", "Enter new location"],
-                    index=1
-                )
-
-                if location_choice == "Select existing location":
-                    if existing_locations:
-                        new_location = st.selectbox("Existing Locations", existing_locations)
-                    else:
-                        st.warning("No existing locations found. Please enter a new location.")
-                        new_location = st.text_input("New Location", value=current_location)
-                else:
-                    new_location = st.text_input("New Location", value=current_location)
-
-            new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input(
-                "Quantity",
-                min_value=0.0,
-                value=current_quantity,
-                step=1.0
-            )
-
-            submitted = st.form_submit_button("Update Entry")
-
-            if submitted:
-                new_location = new_location.strip() if new_location else ""
-                new_item = new_item.strip() if new_item else ""
-
-                if new_location and new_item:
-                    try:
-                        cur.execute("""
-                            UPDATE "food_entries_master_cleaned (2)"
-                            SET date = %s,
-                                location = %s,
-                                item = %s,
-                                quantity = %s
-                            WHERE id = %s;
-                        """, (new_date, new_location, new_item, new_quantity, entry_id))
-
-                        conn.commit()
-                        st.success(f"✅ Entry ID {entry_id} updated successfully.")
-                        st.info("Refresh or revisit the page to see updated options.")
-                    except Exception as e:
-                        st.error(f"Error updating entry: {e}")
-                else:
-                    st.warning("Please fill in both the location and item fields.")
-
-    cur.close()
-    conn.close()
-
-except Exception as e:
-    st.error(f"Database connection error: {e}")
+                st.success(f"✅ Added {item} at {location} on {entry_date}")
+            except Exception as e:
+                st.error(f"Error adding entry: {e}")
+        else:
+            st.warning("Please fill in all fields.")
