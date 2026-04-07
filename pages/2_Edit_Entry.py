@@ -14,7 +14,6 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Get all current entries dynamically
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -39,7 +38,6 @@ try:
         current_item = selected_entry[3]
         current_quantity = float(selected_entry[4])
 
-        # Get current locations dynamically
         cur.execute("""
             SELECT DISTINCT TRIM(location) AS location
             FROM "food_entries_master_cleaned (2)"
@@ -99,6 +97,7 @@ try:
 
                         conn.commit()
                         st.success(f"✅ Entry ID {entry_id} updated successfully.")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error updating entry: {e}")
                 else:
