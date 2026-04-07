@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Edit Food Entry", page_icon="✏️")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB1"])
+    return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("✏️ Edit a Food Entry")
 
