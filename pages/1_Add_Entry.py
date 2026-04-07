@@ -4,7 +4,7 @@ import psycopg2
 st.set_page_config(page_title="Add Food Entry", page_icon="➕")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB"])
+    return psycopg2.connect(st.secrets["URL_DB1"])
 
 st.title("➕ Add a New Food Entry")
 st.write("Add a new food record using an existing location or create a new one.")
@@ -36,7 +36,7 @@ try:
             if existing_locations:
                 location = st.selectbox("Existing Locations", existing_locations)
             else:
-                st.warning("No existing locations found. Please enter a new location.")
+                st.warning("No existing locations found. Please enter a new location below.")
                 location = st.text_input("New Location")
         else:
             location = st.text_input("New Location")
@@ -59,7 +59,6 @@ try:
 
                     conn.commit()
                     st.success(f"✅ Added {item} at {location} on {entry_date}")
-                    st.info("Refresh or revisit the page to see the updated location list.")
                 except Exception as e:
                     st.error(f"Error adding entry: {e}")
             else:
