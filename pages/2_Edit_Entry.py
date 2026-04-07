@@ -8,11 +8,13 @@ def get_connection():
     return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("✏️ Edit a Food Entry")
+st.write("Update an existing food entry using a current or new location.")
 
 try:
     conn = get_connection()
     cur = conn.cursor()
 
+    # Get all current entries dynamically
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -21,69 +23,99 @@ try:
     rows = cur.fetchall()
 
     if not rows:
-        st.info("No entries available.")
+        st.info("No entries available to edit.")
     else:
         entry_options = {
-            f"ID {r[0]} | {r[1]} | {r[2]} | {r[3]} | Qty: {r[4]}": r
-            for r in rows
+            f"ID {row[0]} | {row[1]} | {row[2]} | {row[3]} | Qty: {row[4]}": row
+            for row in rows
         }
 
-        selected = st.selectbox("Select entry", list(entry_options.keys()))
-        entry = entry_options[selected]
+        selected_label = st.selectbox("Select an entry to edit", list(entry_options.keys()))
+        selected_entry = entry_options[selected_label]
 
-        entry_id = entry[0]
-        current_date = pd.to_datetime(entry[1]).date()
-        current_location = entry[2]
-        current_item = entry[3]
-        current_quantity = float(entry[4])
+        entry_id = selected_entry[0]
+        current_date = pd.to_datetime(selected_entry[1]).date()
+        current_location = selected_entry[2].strip() if selected_entry[2] else ""
+        current_item = selected_entry[3]
+        current_quantity = float(selected_entry[4])
 
-        # Load locations
+        # Get current locations dynamically
         cur.execute("""
-            SELECT DISTINCT TRIM(location)
+            SELECT DISTINCT TRIM(location) AS location
             FROM "food_entries_master_cleaned (2)"
             WHERE location IS NOT NULL AND TRIM(location) <> ''
             ORDER BY location;
         """)
-        existing_locations = [row[0] for row in cur.fetchall()]
+        location_results = cur.fetchall()
+        existing_locations = [row[0] for row in location_results]
 
-        with st.form("edit_form"):
+        with st.form("edit_entry_form"):
             new_date = st.date_input("Date", value=current_date)
 
             st.subheader("Location")
+            if current_location in existing_locations:
+                default_index = existing_locations.index(current_location)
+                location_choice = st.radio(
+                    "Choose how to update the location:",
+                    ["Select existing location", "Enter new location"]
+                )
 
-            selected_location = st.selectbox(
-                "Choose an existing location (optional)",
-                [""] + existing_locations,
-                index=([""] + existing_locations).index(current_location)
-                if current_location in existing_locations else 0
-            )
+                if location_choice == "Select existing location":
+                    new_location = st.selectbox(
+                        "Existing Locations",
+                        existing_locations,
+                        index=default_index
+                    )
+                else:
+                    new_location = st.text_input("New Location", value=current_location)
+            else:
+                location_choice = st.radio(
+                    "Choose how to update the location:",
+                    ["Select existing location", "Enter new location"],
+                    index=1
+                )
 
-            new_location = st.text_input(
-                "Or type a new location",
-                value=current_location
-            )
+                if location_choice == "Select existing location":
+                    if existing_locations:
+                        new_location = st.selectbox("Existing Locations", existing_locations)
+                    else:
+                        st.warning("No existing locations found. Please enter a new location.")
+                        new_location = st.text_input("New Location", value=current_location)
+                else:
+                    new_location = st.text_input("New Location", value=current_location)
 
             new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input("Quantity", value=current_quantity)
+            new_quantity = st.number_input(
+                "Quantity",
+                min_value=0.0,
+                value=current_quantity,
+                step=1.0
+            )
 
-            submitted = st.form_submit_button("Update")
+            submitted = st.form_submit_button("Update Entry")
 
             if submitted:
-                # 🔑 SAME LOGIC
-                location = new_location.strip() if new_location else selected_location
+                new_location = new_location.strip() if new_location else ""
+                new_item = new_item.strip() if new_item else ""
 
-                if location and new_item:
-                    cur.execute("""
-                        UPDATE "food_entries_master_cleaned (2)"
-                        SET date=%s, location=%s, item=%s, quantity=%s
-                        WHERE id=%s;
-                    """, (new_date, location.strip(), new_item.strip(), new_quantity, entry_id))
+                if new_location and new_item:
+                    try:
+                        cur.execute("""
+                            UPDATE "food_entries_master_cleaned (2)"
+                            SET date = %s,
+                                location = %s,
+                                item = %s,
+                                quantity = %s
+                            WHERE id = %s;
+                        """, (new_date, new_location, new_item, new_quantity, entry_id))
 
-                    conn.commit()
-                    st.success("✅ Updated successfully")
-                    st.rerun()
+                        conn.commit()
+                        st.success(f"✅ Entry ID {entry_id} updated successfully.")
+                        st.info("Refresh or revisit the page to see updated options.")
+                    except Exception as e:
+                        st.error(f"Error updating entry: {e}")
                 else:
-                    st.warning("Please enter a location and item.")
+                    st.warning("Please fill in both the location and item fields.")
 
     cur.close()
     conn.close()
