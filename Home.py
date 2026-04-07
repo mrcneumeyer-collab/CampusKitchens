@@ -21,7 +21,7 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Overall summary metrics for the full table
+    # Overall summary metrics
     cur.execute('SELECT COUNT(*) FROM "food_entries_master_cleaned (2)";')
     total_entries = cur.fetchone()[0]
 
@@ -43,7 +43,7 @@ try:
     st.markdown("---")
     st.subheader("🔍 Filter Food Entries")
 
-    # Dynamic year options from the database
+    # Dynamic year options
     cur.execute("""
         SELECT DISTINCT EXTRACT(YEAR FROM date) AS year
         FROM "food_entries_master_cleaned (2)"
@@ -53,8 +53,7 @@ try:
     year_results = cur.fetchall()
     year_options = ["All"] + [str(int(row[0])) for row in year_results if row[0] is not None]
 
-    # Dynamic location options from the database
-    # Any new location added later will appear automatically
+    # Dynamic location options
     cur.execute("""
         SELECT DISTINCT TRIM(location) AS location
         FROM "food_entries_master_cleaned (2)"
