@@ -7,7 +7,6 @@ def get_connection():
     return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("➕ Add a New Food Entry")
-st.write("Add a new food record using an existing location or create a new one.")
 
 try:
     conn = get_connection()
@@ -19,8 +18,7 @@ try:
         WHERE location IS NOT NULL AND TRIM(location) <> ''
         ORDER BY location;
     """)
-    location_results = cur.fetchall()
-    existing_locations = [row[0] for row in location_results]
+    existing_locations = [row[0] for row in cur.fetchall()]
 
     with st.form("add_entry_form"):
         entry_date = st.date_input("Date")
@@ -28,17 +26,31 @@ try:
         st.subheader("Location")
         location_choice = st.radio(
             "Choose how to enter the location:",
-            ["Select existing location", "Enter new location"]
+            ["Select existing location", "Enter new location"],
+            key="add_location_choice"
         )
 
+        location_container = st.empty()
+
         if location_choice == "Select existing location":
-            if existing_locations:
-                location = st.selectbox("Existing Locations", existing_locations)
-            else:
-                st.warning("No existing locations found. Please enter a new location below.")
-                location = st.text_input("New Location")
+            with location_container:
+                if existing_locations:
+                    location = st.selectbox(
+                        "Existing Locations",
+                        existing_locations,
+                        key="add_existing_location"
+                    )
+                else:
+                    location = st.text_input(
+                        "New Location",
+                        key="add_new_location_fallback"
+                    )
         else:
-            location = st.text_input("New Location")
+            with location_container:
+                location = st.text_input(
+                    "New Location",
+                    key="add_new_location"
+                )
 
         item = st.text_input("Item")
         quantity = st.number_input("Quantity", min_value=0.0, step=1.0)
@@ -57,12 +69,12 @@ try:
                     """, (entry_date, location, item, quantity))
 
                     conn.commit()
-                    st.success(f"✅ Added {item} at {location} on {entry_date}")
+                    st.success(f"✅ Added {item} at {location}")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error adding entry: {e}")
+                    st.error(f"Error: {e}")
             else:
-                st.warning("Please fill in both the location and item fields.")
+                st.warning("Please fill all fields.")
 
     cur.close()
     conn.close()
