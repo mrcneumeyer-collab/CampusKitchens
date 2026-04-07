@@ -37,6 +37,7 @@ try:
         current_item = entry[3]
         current_quantity = float(entry[4])
 
+        # Load locations
         cur.execute("""
             SELECT DISTINCT TRIM(location)
             FROM "food_entries_master_cleaned (2)"
@@ -49,29 +50,18 @@ try:
             new_date = st.date_input("Date", value=current_date)
 
             st.subheader("Location")
-            location_choice = st.radio(
-                "Choose location type:",
-                ["Select existing location", "Enter new location"],
-                key="edit_location_choice"
+
+            selected_location = st.selectbox(
+                "Choose an existing location (optional)",
+                [""] + existing_locations,
+                index=([""] + existing_locations).index(current_location)
+                if current_location in existing_locations else 0
             )
 
-            location_container = st.empty()
-
-            if location_choice == "Select existing location":
-                with location_container:
-                    new_location = st.selectbox(
-                        "Existing Locations",
-                        existing_locations,
-                        index=existing_locations.index(current_location) if current_location in existing_locations else 0,
-                        key="edit_existing_location"
-                    )
-            else:
-                with location_container:
-                    new_location = st.text_input(
-                        "New Location",
-                        value=current_location,
-                        key="edit_new_location"
-                    )
+            new_location = st.text_input(
+                "Or type a new location",
+                value=current_location
+            )
 
             new_item = st.text_input("Item", value=current_item)
             new_quantity = st.number_input("Quantity", value=current_quantity)
@@ -79,21 +69,21 @@ try:
             submitted = st.form_submit_button("Update")
 
             if submitted:
-                new_location = new_location.strip()
-                new_item = new_item.strip()
+                # 🔑 SAME LOGIC
+                location = new_location.strip() if new_location else selected_location
 
-                if new_location and new_item:
+                if location and new_item:
                     cur.execute("""
                         UPDATE "food_entries_master_cleaned (2)"
                         SET date=%s, location=%s, item=%s, quantity=%s
                         WHERE id=%s;
-                    """, (new_date, new_location, new_item, new_quantity, entry_id))
+                    """, (new_date, location.strip(), new_item.strip(), new_quantity, entry_id))
 
                     conn.commit()
                     st.success("✅ Updated successfully")
                     st.rerun()
                 else:
-                    st.warning("Fill all fields")
+                    st.warning("Please enter a location and item.")
 
     cur.close()
     conn.close()
