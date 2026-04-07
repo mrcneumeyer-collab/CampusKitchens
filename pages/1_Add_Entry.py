@@ -13,7 +13,6 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Get current locations dynamically from the database
     cur.execute("""
         SELECT DISTINCT TRIM(location) AS location
         FROM "food_entries_master_cleaned (2)"
@@ -59,6 +58,7 @@ try:
 
                     conn.commit()
                     st.success(f"✅ Added {item} at {location} on {entry_date}")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error adding entry: {e}")
             else:
