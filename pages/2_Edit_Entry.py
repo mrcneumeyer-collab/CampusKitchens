@@ -8,13 +8,13 @@ def get_connection():
     return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("✏️ Edit a Food Entry")
-st.write("Update an existing food entry using a current or new location.")
+st.write("Update an existing food entry.")
 
 try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Get all current entries dynamically
+    # Pull all entries dynamically
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -39,7 +39,7 @@ try:
         current_item = selected_entry[3]
         current_quantity = float(selected_entry[4])
 
-        # Get current locations dynamically
+        # Pull existing locations only
         cur.execute("""
             SELECT DISTINCT TRIM(location) AS location
             FROM "food_entries_master_cleaned (2)"
@@ -49,40 +49,16 @@ try:
         location_results = cur.fetchall()
         existing_locations = [row[0] for row in location_results]
 
+        location_index = existing_locations.index(current_location) if current_location in existing_locations else 0
+
         with st.form("edit_entry_form"):
             new_date = st.date_input("Date", value=current_date)
 
-            st.subheader("Location")
-            if current_location in existing_locations:
-                default_index = existing_locations.index(current_location)
-                location_choice = st.radio(
-                    "Choose how to update the location:",
-                    ["Select existing location", "Enter new location"]
-                )
-
-                if location_choice == "Select existing location":
-                    new_location = st.selectbox(
-                        "Existing Locations",
-                        existing_locations,
-                        index=default_index
-                    )
-                else:
-                    new_location = st.text_input("New Location", value=current_location)
-            else:
-                location_choice = st.radio(
-                    "Choose how to update the location:",
-                    ["Select existing location", "Enter new location"],
-                    index=1
-                )
-
-                if location_choice == "Select existing location":
-                    if existing_locations:
-                        new_location = st.selectbox("Existing Locations", existing_locations)
-                    else:
-                        st.warning("No existing locations found. Please enter a new location.")
-                        new_location = st.text_input("New Location", value=current_location)
-                else:
-                    new_location = st.text_input("New Location", value=current_location)
+            new_location = st.selectbox(
+                "Location",
+                existing_locations,
+                index=location_index
+            )
 
             new_item = st.text_input("Item", value=current_item)
             new_quantity = st.number_input(
@@ -95,7 +71,6 @@ try:
             submitted = st.form_submit_button("Update Entry")
 
             if submitted:
-                new_location = new_location.strip() if new_location else ""
                 new_item = new_item.strip() if new_item else ""
 
                 if new_location and new_item:
@@ -111,11 +86,11 @@ try:
 
                         conn.commit()
                         st.success(f"✅ Entry ID {entry_id} updated successfully.")
-                        st.info("Refresh or revisit the page to see updated options.")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error updating entry: {e}")
                 else:
-                    st.warning("Please fill in both the location and item fields.")
+                    st.warning("Please fill in all required fields.")
 
     cur.close()
     conn.close()
