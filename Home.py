@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Food Entry Database App", page_icon="🍽️", layout="wide")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB1"])
+    return psycopg2.connect(st.secrets["URL_DB"])
 
 st.title("🍽️ Food Entry Database App")
 st.write("Welcome! Use the sidebar to view, add, edit, or delete food entries.")
