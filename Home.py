@@ -50,7 +50,7 @@ try:
     col1, col2 = st.columns(2)
 
     with col1:
-        year_filter = st.selectbox("Filter by Year", ["All", "2023", "2024"])
+        year_filter = st.selectbox("Filter by Year", ["All", "2023", "2024", "2025", "2026", "2027"])
 
     with col2:
         location_filter = st.selectbox("Filter by Location", location_options)
