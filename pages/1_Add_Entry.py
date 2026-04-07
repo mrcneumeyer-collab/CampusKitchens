@@ -1,89 +1,70 @@
 import streamlit as st
 import psycopg2
-import pandas as pd
 
-st.set_page_config(page_title="Edit Food Entry", page_icon="✏️")
+st.set_page_config(page_title="Add Food Entry", page_icon="➕")
 
 def get_connection():
     return psycopg2.connect(st.secrets["URL_DB"])
 
-st.title("✏️ Edit a Food Entry")
+st.title("➕ Add a New Food Entry")
+st.write("Add a new food record using an existing location or create a new one.")
 
 try:
     conn = get_connection()
     cur = conn.cursor()
 
+    # Get current locations dynamically from the database
     cur.execute("""
-        SELECT id, date, location, item, quantity
+        SELECT DISTINCT TRIM(location) AS location
         FROM "food_entries_master_cleaned (2)"
-        ORDER BY date ASC, id ASC;
+        WHERE location IS NOT NULL AND TRIM(location) <> ''
+        ORDER BY location;
     """)
-    rows = cur.fetchall()
+    location_results = cur.fetchall()
+    existing_locations = [row[0] for row in location_results]
 
-    if not rows:
-        st.info("No entries available.")
-    else:
-        entry_options = {
-            f"ID {r[0]} | {r[1]} | {r[2]} | {r[3]} | Qty: {r[4]}": r
-            for r in rows
-        }
+    with st.form("add_entry_form"):
+        entry_date = st.date_input("Date")
 
-        selected = st.selectbox("Select entry", list(entry_options.keys()))
-        entry = entry_options[selected]
+        st.subheader("Location")
+        location_choice = st.radio(
+            "Choose how to enter the location:",
+            ["Select existing location", "Enter new location"]
+        )
 
-        entry_id = entry[0]
-        current_date = pd.to_datetime(entry[1]).date()
-        current_location = entry[2]
-        current_item = entry[3]
-        current_quantity = float(entry[4])
+        if location_choice == "Select existing location":
+            if existing_locations:
+                location = st.selectbox("Existing Locations", existing_locations)
+            else:
+                st.warning("No existing locations found. Please enter a new location.")
+                location = st.text_input("New Location")
+        else:
+            location = st.text_input("New Location")
 
-        # Load locations
-        cur.execute("""
-            SELECT DISTINCT TRIM(location)
-            FROM "food_entries_master_cleaned (2)"
-            WHERE location IS NOT NULL AND TRIM(location) <> ''
-            ORDER BY location;
-        """)
-        existing_locations = [row[0] for row in cur.fetchall()]
+        location = st.text_input("New Location")
+        item = st.text_input("Item")
+        quantity = st.number_input("Quantity", min_value=0.0, step=1.0)
 
-        with st.form("edit_form"):
-            new_date = st.date_input("Date", value=current_date)
+        submitted = st.form_submit_button("Add Entry")
 
-            st.subheader("Location")
+        if submitted:
+            location = location.strip() if location else ""
+            item = item.strip() if item else ""
 
-            selected_location = st.selectbox(
-                "Choose an existing location (optional)",
-                [""] + existing_locations,
-                index=([""] + existing_locations).index(current_location)
-                if current_location in existing_locations else 0
-            )
-
-            new_location = st.text_input(
-                "Or type a new location",
-                value=current_location
-            )
-
-            new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input("Quantity", value=current_quantity)
-
-            submitted = st.form_submit_button("Update")
-
-            if submitted:
-                # 🔑 SAME LOGIC
-                location = new_location.strip() if new_location else selected_location
-
-                if location and new_item:
+            if location and item:
+                try:
                     cur.execute("""
-                        UPDATE "food_entries_master_cleaned (2)"
-                        SET date=%s, location=%s, item=%s, quantity=%s
-                        WHERE id=%s;
-                    """, (new_date, location.strip(), new_item.strip(), new_quantity, entry_id))
+                        INSERT INTO "food_entries_master_cleaned (2)" (date, location, item, quantity)
+                        VALUES (%s, %s, %s, %s);
+                    """, (entry_date, location, item, quantity))
 
                     conn.commit()
-                    st.success("✅ Updated successfully")
-                    st.rerun()
-                else:
-                    st.warning("Please enter a location and item.")
+                    st.success(f"✅ Added {item} at {location} on {entry_date}")
+                    st.info("Refresh or revisit the page to see the updated location list.")
+                except Exception as e:
+                    st.error(f"Error adding entry: {e}")
+            else:
+                st.warning("Please fill in both the location and item fields.")
 
     cur.close()
     conn.close()
