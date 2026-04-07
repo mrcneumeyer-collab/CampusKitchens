@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Food Entry Database App", page_icon="🍽️", layout="wide")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB"])
+    return psycopg2.connect(st.secrets["URL_DB1"])
 
 st.title("🍽️ Food Entry Database App")
 st.write("Welcome! Use the sidebar to view, add, edit, or delete food entries.")
@@ -36,13 +36,47 @@ try:
     col4.metric("Total Quantity", total_quantity)
 
     st.markdown("---")
-    st.subheader("📋 All Food Entries")
+    st.subheader("🔍 Filter Food Entries")
 
+    # Get locations for dropdown
     cur.execute("""
+        SELECT DISTINCT location
+        FROM "food_entries_master_cleaned (2)"
+        ORDER BY location;
+    """)
+    location_results = cur.fetchall()
+    location_options = ["All"] + [row[0] for row in location_results]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        year_filter = st.selectbox("Filter by Year", ["All", "2023", "2024"])
+
+    with col2:
+        location_filter = st.selectbox("Filter by Location", location_options)
+
+    st.markdown("---")
+    st.subheader("📋 Food Entries Table")
+
+    # Build query based on filters
+    base_query = """
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
-        ORDER BY date ASC, id ASC;
-    """)
+        WHERE 1=1
+    """
+    params = []
+
+    if year_filter != "All":
+        base_query += ' AND CAST(date AS TEXT) LIKE %s'
+        params.append(f"{year_filter}%")
+
+    if location_filter != "All":
+        base_query += " AND location = %s"
+        params.append(location_filter)
+
+    base_query += " ORDER BY date ASC, id ASC;"
+
+    cur.execute(base_query, tuple(params))
     rows = cur.fetchall()
 
     if rows:
@@ -50,7 +84,7 @@ try:
         df["Date"] = df["Date"].astype(str)
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("No food entries found.")
+        st.info("No food entries match the selected filters.")
 
     cur.close()
     conn.close()
