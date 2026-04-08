@@ -8,12 +8,13 @@ def get_connection():
     return psycopg2.connect(st.secrets["DB_URL"])
 
 st.title("✏️ Edit a Food Entry")
+st.write("Select an entry below and update its information.")
 
 try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # 🔥 Pull all entries
+    # Pull all entries for selection
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -33,45 +34,41 @@ try:
         selected_entry = entry_options[selected_label]
 
         entry_id = selected_entry[0]
-        current_date = pd.to_datetime(selected_entry[1]).date()
+        current_date = str(selected_entry[1])
         current_location = selected_entry[2]
         current_item = selected_entry[3]
-        current_quantity = float(selected_entry[4])
+        current_quantity = str(selected_entry[4])
 
-        # 🔥 Get locations dynamically
+        # Pull locations dynamically for dropdown
         cur.execute("""
-    SELECT DISTINCT TRIM(location) AS location
-    FROM "food_entries_master_cleaned (2)"
-    WHERE location IS NOT NULL AND TRIM(location) <> ''
-    ORDER BY location;
-""")
-locations = [row[0] for row in cur.fetchall()]
+            SELECT DISTINCT TRIM(location) AS location
+            FROM "food_entries_master_cleaned (2)"
+            WHERE location IS NOT NULL AND TRIM(location) <> ''
+            ORDER BY location;
+        """)
+        location_results = cur.fetchall()
+        location_options = [row[0] for row in location_results]
 
-        # find current location index safely
-        location_index = locations.index(current_location) if current_location in locations else 0
+        if not location_options:
+            st.warning("No locations found in the database.")
+            st.stop()
+
+        location_index = location_options.index(current_location) if current_location in location_options else 0
 
         with st.form("edit_entry_form"):
-            new_date = st.date_input("Date", value=current_date)
-
-            # ✅ Dropdown instead of text input
-            new_location = st.selectbox(
-                "Location",
-                locations,
-                index=location_index
-            )
-
+            new_date = st.text_input("Date", value=current_date, placeholder="YYYY-MM-DD")
+            new_location = st.selectbox("Location", location_options, index=location_index)
             new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input(
-                "Quantity",
-                min_value=0.0,
-                value=current_quantity,
-                step=1.0
-            )
+            new_quantity = st.text_input("Quantity", value=current_quantity)
 
             submitted = st.form_submit_button("Update Entry")
 
             if submitted:
-                if new_location and new_item:
+                new_date = new_date.strip() if new_date else ""
+                new_item = new_item.strip() if new_item else ""
+                new_quantity = new_quantity.strip() if new_quantity else ""
+
+                if new_date and new_location and new_item and new_quantity:
                     try:
                         cur.execute("""
                             UPDATE "food_entries_master_cleaned (2)"
