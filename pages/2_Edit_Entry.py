@@ -34,7 +34,7 @@ try:
         selected_entry = entry_options[selected_label]
 
         entry_id = selected_entry[0]
-        current_date = str(selected_entry[1])
+        current_date = pd.to_datetime(selected_entry[1]).date()
         current_location = selected_entry[2]
         current_item = selected_entry[3]
         current_quantity = str(selected_entry[4])
@@ -56,7 +56,7 @@ try:
         location_index = location_options.index(current_location) if current_location in location_options else 0
 
         with st.form("edit_entry_form"):
-            new_date = st.text_input("Date", value=current_date, placeholder="YYYY-MM-DD")
+            new_date = st.date_input("Date", value=current_date)
             new_location = st.selectbox("Location", location_options, index=location_index)
             new_item = st.text_input("Item", value=current_item)
             new_quantity = st.text_input("Quantity", value=current_quantity)
@@ -64,7 +64,6 @@ try:
             submitted = st.form_submit_button("Update Entry")
 
             if submitted:
-                new_date = new_date.strip() if new_date else ""
                 new_item = new_item.strip() if new_item else ""
                 new_quantity = new_quantity.strip() if new_quantity else ""
 
