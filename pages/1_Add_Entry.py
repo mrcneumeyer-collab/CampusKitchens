@@ -4,7 +4,7 @@ import psycopg2
 st.set_page_config(page_title="Add Food Entry", page_icon="➕")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB])
+    return psycopg2.connect(st.secrets["DB_URL"])
 
 st.title("➕ Add a New Food Entry")
 
