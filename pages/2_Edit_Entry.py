@@ -15,7 +15,7 @@ try:
 
     cur.execute("""
         SELECT id, date, location, item, quantity
-        FROM food_entries_master
+        FROM "food_entries_master_cleaned (2)"
         ORDER BY date ASC, id ASC;
     """)
     rows = cur.fetchall()
@@ -49,7 +49,7 @@ try:
                 if new_location and new_item:
                     try:
                         cur.execute("""
-                            UPDATE food_entries_master
+                            UPDATE "food_entries_master_cleaned (2)"
                             SET date = %s, location = %s, item = %s, quantity = %s
                             WHERE id = %s;
                         """, (new_date, new_location, new_item, new_quantity, entry_id))
