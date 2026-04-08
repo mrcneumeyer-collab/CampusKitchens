@@ -2,14 +2,10 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 
-st.set_page_config(
-    page_title="Food Entry Database App",
-    page_icon="🍽️",
-    layout="wide"
-)
+st.set_page_config(page_title="Food Entry Database App", page_icon="🍽️", layout="wide")
 
 def get_connection():
-    return psycopg2.connect(st.secrets["URL_DB"])
+    return psycopg2.connect(st.secrets["DB_URL"])
 
 st.title("🍽️ Food Entry Database App")
 st.write("Welcome! Use the sidebar to view, add, edit, or delete food entries.")
@@ -21,7 +17,6 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Overall summary metrics
     cur.execute('SELECT COUNT(*) FROM "food_entries_master_cleaned (2)";')
     total_entries = cur.fetchone()[0]
 
@@ -37,42 +32,34 @@ try:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Entries", total_entries)
     col2.metric("Locations", total_locations)
-    col3.metric("Unique Items", total_items)
+    col3.metric("Items", total_items)
     col4.metric("Total Quantity", total_quantity)
 
     st.markdown("---")
     st.subheader("🔍 Filter Food Entries")
 
-    # Dynamic year options
+    # Get locations for dropdown
     cur.execute("""
-        SELECT DISTINCT EXTRACT(YEAR FROM date) AS year
+        SELECT DISTINCT location
         FROM "food_entries_master_cleaned (2)"
-        WHERE date IS NOT NULL
-        ORDER BY year;
-    """)
-    year_results = cur.fetchall()
-    year_options = ["All"] + [str(int(row[0])) for row in year_results if row[0] is not None]
-
-    # Dynamic location options
-    cur.execute("""
-        SELECT DISTINCT TRIM(location) AS location
-        FROM "food_entries_master_cleaned (2)"
-        WHERE location IS NOT NULL AND TRIM(location) <> ''
         ORDER BY location;
     """)
     location_results = cur.fetchall()
     location_options = ["All"] + [row[0] for row in location_results]
 
-    filter_col1, filter_col2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with filter_col1:
-        year_filter = st.selectbox("Filter by Year", year_options)
+    with col1:
+        year_filter = st.selectbox("Filter by Year", ["All", "2023", "2024"])
 
-    with filter_col2:
+    with col2:
         location_filter = st.selectbox("Filter by Location", location_options)
 
-    # Build filtered query
-    query = """
+    st.markdown("---")
+    st.subheader("📋 Food Entries Table")
+
+    # Build query based on filters
+    base_query = """
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
         WHERE 1=1
@@ -80,43 +67,21 @@ try:
     params = []
 
     if year_filter != "All":
-        query += " AND EXTRACT(YEAR FROM date) = %s"
-        params.append(int(year_filter))
+        base_query += ' AND CAST(date AS TEXT) LIKE %s'
+        params.append(f"{year_filter}%")
 
     if location_filter != "All":
-        query += " AND TRIM(location) = %s"
+        base_query += " AND location = %s"
         params.append(location_filter)
 
-    query += " ORDER BY date ASC, id ASC;"
+    base_query += " ORDER BY date ASC, id ASC;"
 
-    cur.execute(query, tuple(params))
+    cur.execute(base_query, tuple(params))
     rows = cur.fetchall()
 
-    st.markdown("---")
-    st.subheader("📈 Filtered Data Summary")
-
     if rows:
-        df = pd.DataFrame(
-            rows,
-            columns=["ID", "Date", "Location", "Item", "Quantity"]
-        )
-
+        df = pd.DataFrame(rows, columns=["ID", "Date", "Location", "Item", "Quantity"])
         df["Date"] = df["Date"].astype(str)
-        df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
-
-        filtered_entries = len(df)
-        filtered_total_quantity = df["Quantity"].sum()
-        filtered_unique_items = df["Item"].nunique()
-        filtered_unique_locations = df["Location"].nunique()
-
-        sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
-        sum_col1.metric("Filtered Entries", filtered_entries)
-        sum_col2.metric("Filtered Unique Items", filtered_unique_items)
-        sum_col3.metric("Filtered Locations", filtered_unique_locations)
-        sum_col4.metric("Filtered Total Quantity", filtered_total_quantity)
-
-        st.markdown("---")
-        st.subheader("📋 Food Entries Table")
         st.dataframe(df, use_container_width=True)
     else:
         st.info("No food entries match the selected filters.")
