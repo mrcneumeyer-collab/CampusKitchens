@@ -28,7 +28,7 @@ try:
         st.stop()
 
     with st.form("add_entry_form"):
-        entry_date = st.text_input("Date", placeholder="YYYY-MM-DD")
+        entry_date = st.date_input("Date")
         location = st.selectbox("Location", location_options)
         item = st.text_input("Item")
         quantity = st.text_input("Quantity")
@@ -36,7 +36,6 @@ try:
         submitted = st.form_submit_button("Add Entry")
 
         if submitted:
-            entry_date = entry_date.strip() if entry_date else ""
             item = item.strip() if item else ""
             quantity = quantity.strip() if quantity else ""
 
