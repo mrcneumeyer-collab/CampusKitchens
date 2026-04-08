@@ -13,6 +13,7 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
+    # 🔥 Pull all entries
     cur.execute("""
         SELECT id, date, location, item, quantity
         FROM "food_entries_master_cleaned (2)"
@@ -37,11 +38,35 @@ try:
         current_item = selected_entry[3]
         current_quantity = float(selected_entry[4])
 
+        # 🔥 Get locations dynamically
+        cur.execute("""
+            SELECT DISTINCT TRIM(location)
+            FROM "food_entries_master_cleaned (2)"
+            WHERE location IS NOT NULL AND TRIM(location) <> ''
+            ORDER BY location;
+        """)
+        locations = [row[0] for row in cur.fetchall()]
+
+        # find current location index safely
+        location_index = locations.index(current_location) if current_location in locations else 0
+
         with st.form("edit_entry_form"):
             new_date = st.date_input("Date", value=current_date)
-            new_location = st.text_input("Location", value=current_location)
+
+            # ✅ Dropdown instead of text input
+            new_location = st.selectbox(
+                "Location",
+                locations,
+                index=location_index
+            )
+
             new_item = st.text_input("Item", value=current_item)
-            new_quantity = st.number_input("Quantity", min_value=0.0, value=current_quantity, step=1.0)
+            new_quantity = st.number_input(
+                "Quantity",
+                min_value=0.0,
+                value=current_quantity,
+                step=1.0
+            )
 
             submitted = st.form_submit_button("Update Entry")
 
@@ -56,6 +81,8 @@ try:
 
                         conn.commit()
                         st.success(f"✅ Entry ID {entry_id} updated successfully.")
+                        st.rerun()
+
                     except Exception as e:
                         st.error(f"Error updating entry: {e}")
                 else:
