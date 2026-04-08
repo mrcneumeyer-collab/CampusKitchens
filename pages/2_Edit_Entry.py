@@ -40,12 +40,12 @@ try:
 
         # 🔥 Get locations dynamically
         cur.execute("""
-            SELECT DISTINCT TRIM(location)
-            FROM "food_entries_master_cleaned (2)"
-            WHERE location IS NOT NULL AND TRIM(location) <> ''
-            ORDER BY location;
-        """)
-        locations = [row[0] for row in cur.fetchall()]
+    SELECT DISTINCT TRIM(location) AS location
+    FROM "food_entries_master_cleaned (2)"
+    WHERE location IS NOT NULL AND TRIM(location) <> ''
+    ORDER BY location;
+""")
+locations = [row[0] for row in cur.fetchall()]
 
         # find current location index safely
         location_index = locations.index(current_location) if current_location in locations else 0
