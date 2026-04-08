@@ -21,7 +21,7 @@ try:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Summary metrics
+    # Overall summary metrics for the full table
     cur.execute('SELECT COUNT(*) FROM "food_entries_master_cleaned (2)";')
     total_entries = cur.fetchone()[0]
 
@@ -37,13 +37,13 @@ try:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Entries", total_entries)
     col2.metric("Locations", total_locations)
-    col3.metric("Items", total_items)
+    col3.metric("Unique Items", total_items)
     col4.metric("Total Quantity", total_quantity)
 
     st.markdown("---")
     st.subheader("🔍 Filter Food Entries")
 
-    # Dynamic year options from database
+    # Dynamic year options
     cur.execute("""
         SELECT DISTINCT EXTRACT(YEAR FROM date) AS year
         FROM "food_entries_master_cleaned (2)"
@@ -53,7 +53,7 @@ try:
     year_results = cur.fetchall()
     year_options = ["All"] + [str(int(row[0])) for row in year_results if row[0] is not None]
 
-    # Dynamic location options from database
+    # Dynamic location options
     cur.execute("""
         SELECT DISTINCT location
         FROM "food_entries_master_cleaned (2)"
@@ -70,9 +70,6 @@ try:
 
     with filter_col2:
         location_filter = st.selectbox("Filter by Location", location_options)
-
-    st.markdown("---")
-    st.subheader("📋 Food Entries Table")
 
     # Build filtered query
     query = """
@@ -95,12 +92,29 @@ try:
     cur.execute(query, tuple(params))
     rows = cur.fetchall()
 
+    st.markdown("---")
+    st.subheader("📈 Filtered Data Summary")
+
     if rows:
         df = pd.DataFrame(
             rows,
             columns=["ID", "Date", "Location", "Item", "Quantity"]
         )
+
         df["Date"] = df["Date"].astype(str)
+        df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
+
+        filtered_entries = len(df)
+        filtered_total_quantity = df["Quantity"].sum()
+        filtered_unique_items = df["Item"].nunique()
+
+        sum_col1, sum_col2, sum_col3 = st.columns(3)
+        sum_col1.metric("Filtered Entries", filtered_entries)
+        sum_col2.metric("Filtered Unique Items", filtered_unique_items)
+        sum_col3.metric("Filtered Total Quantity", filtered_total_quantity)
+
+        st.markdown("---")
+        st.subheader("📋 Food Entries Table")
         st.dataframe(df, use_container_width=True)
     else:
         st.info("No food entries match the selected filters.")
